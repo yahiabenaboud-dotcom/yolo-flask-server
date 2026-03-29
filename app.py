@@ -8,40 +8,57 @@ from ultralytics import YOLO
 app = Flask(__name__)
 CORS(app)
 
-# ==================================================
-# استخدام نموذج أقوى وأدق:
-# - yolo11n.pt  (أحدث إصدار، دقة عالية وسريع)
-# - yolov8s.pt  (أكبر من yolov8n، دقة أفضل)
-# - yolo26n.pt  (أحدث إصدار تجريبي، يتطلب تحديث ultralytics)
-# ==================================================
-# اختر أحد السطور التالية (افتح التعليق عن النموذج المطلوب)
-model = YOLO('yolo11n.pt')      # يوصى به (يتنزّل تلقائياً أول مرة)
-# model = YOLO('yolov8s.pt')    # دقة أعلى من yolov8n
-# model = YOLO('yolo26n.pt')    # أحدث نموذج (جرب إذا كنت تريد الأحدث)
+# 🚨 لا تغيّر النموذج (حسب طلبك)
+model = YOLO('yolo11n.pt')  # أو النموذج الذي تستخدمه
 
-@app.route('/detect', methods=['POST'])
+@app.route("/")
+def home():
+    return "YOLO API Running 🚀"
+
+@app.route("/detect", methods=["POST"])
 def detect():
-    data = request.get_json()
-    if not data or 'image' not in data:
-        return jsonify({'error': 'No image provided'}), 400
+    try:
+        data = request.get_json()
 
-    image_base64 = data['image']
-    if ',' in image_base64:
-        image_base64 = image_base64.split(',')[1]
+        if not data or "image" not in data:
+            return jsonify({"error": "No image provided"}), 400
 
-    img_bytes = base64.b64decode(image_base64)
-    nparr = np.frombuffer(img_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        image_base64 = data["image"]
 
-    results = model(img)[0]
-    detections = []
-    for box in results.boxes:
-        cls = int(box.cls[0])
-        label = model.names[cls]
-        conf = float(box.conf[0])
-        detections.append({'label': label, 'confidence': conf})
+        # إزالة header إذا موجود
+        if "," in image_base64:
+            image_base64 = image_base64.split(",")[1]
 
-    return jsonify({'detections': detections})
+        # فك التشفير
+        img_bytes = base64.b64decode(image_base64)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+        if img is None:
+            return jsonify({"error": "Invalid image"}), 400
+
+        # YOLO inference (بدون تغيير النموذج)
+        results = model(img)[0]
+
+        detections = []
+        for box in results.boxes:
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+
+            detections.append({
+                "label": model.names[cls],
+                "confidence": round(conf, 3)
+            })
+
+        return jsonify({
+            "detections": detections
+        })
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
