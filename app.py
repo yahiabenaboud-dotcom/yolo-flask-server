@@ -4,61 +4,40 @@ import base64
 import cv2
 import numpy as np
 from ultralytics import YOLO
+import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # السماح لجميع النطاقات بالاتصال
 
-# 🚨 لا تغيّر النموذج (حسب طلبك)
-model = YOLO('yolo11n.pt')  # أو النموذج الذي تستخدمه
+# تحميل النموذج (يمكن استخدام yolo11n.pt أو غيره)
+model = YOLO('yolo11n.pt')
 
-@app.route("/")
-def home():
-    return "YOLO API Running 🚀"
-
-@app.route("/detect", methods=["POST"])
+@app.route('/detect', methods=['POST'])
 def detect():
-    try:
-        data = request.get_json()
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({'error': 'No image provided'}), 400
 
-        if not data or "image" not in data:
-            return jsonify({"error": "No image provided"}), 400
+    image_base64 = data['image']
+    if ',' in image_base64:
+        image_base64 = image_base64.split(',')[1]
 
-        image_base64 = data["image"]
+    img_bytes = base64.b64decode(image_base64)
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # إزالة header إذا موجود
-        if "," in image_base64:
-            image_base64 = image_base64.split(",")[1]
+    results = model(img)[0]
+    detections = []
+    for box in results.boxes:
+        cls = int(box.cls[0])
+        label = model.names[cls]
+        conf = float(box.conf[0])
+        detections.append({'label': label, 'confidence': conf})
 
-        # فك التشفير
-        img_bytes = base64.b64decode(image_base64)
-        np_arr = np.frombuffer(img_bytes, np.uint8)
-        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    return jsonify({'detections': detections})
 
-        if img is None:
-            return jsonify({"error": "Invalid image"}), 400
-
-        # YOLO inference (بدون تغيير النموذج)
-        results = model(img)[0]
-
-        detections = []
-        for box in results.boxes:
-            cls = int(box.cls[0])
-            conf = float(box.conf[0])
-
-            detections.append({
-                "label": model.names[cls],
-                "confidence": round(conf, 3)
-            })
-
-        return jsonify({
-            "detections": detections
-        })
-
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    # استخدام المنفذ من متغير البيئة PORT (يوفره Render) أو 5000 كقيمة افتراضية
+    port = int(os.environ.get('PORT', 5000))
+    # تشغيل الخادم على جميع الواجهات، وبدون debug في الإنتاج
+    app.run(host='0.0.0.0', port=port, debug=False)
