@@ -9,7 +9,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-model = YOLO('yolo11n.pt')  # أو أي نموذج تريده
+model = YOLO('yolo8n.pt')  # أو أي نموذج تريده
 
 @app.route('/detect', methods=['POST'])
 def detect():
