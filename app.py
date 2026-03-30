@@ -7,9 +7,8 @@ from ultralytics import YOLO
 import os
 
 app = Flask(__name__)
-CORS(app)  # السماح لجميع النطاقات بالاتصال
+CORS(app)
 
-# تحميل النموذج (يمكن استخدام yolo11n.pt أو غيره)
 model = YOLO('yolo11n.pt')
 
 @app.route('/detect', methods=['POST'])
@@ -37,7 +36,5 @@ def detect():
     return jsonify({'detections': detections})
 
 if __name__ == '__main__':
-    # استخدام المنفذ من متغير البيئة PORT (يوفره Render) أو 5000 كقيمة افتراضية
     port = int(os.environ.get('PORT', 5000))
-    # تشغيل الخادم على جميع الواجهات، وبدون debug في الإنتاج
     app.run(host='0.0.0.0', port=port, debug=False)
