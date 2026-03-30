@@ -1,6 +1,6 @@
-flask
-flask-cors
-ultralytics
-opencv-python
-pillow
-gunicorn
+flask==2.3.3
+flask-cors==4.0.0
+ultralytics==8.0.200
+opencv-python==4.8.1.78
+pillow==10.0.0
+gunicorn==21.2.0
