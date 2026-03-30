@@ -1,31 +1,40 @@
-from ultralytics import YOLO
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import base64
 import cv2
 import numpy as np
-import base64
+from ultralytics import YOLO
+import os
 
-model = YOLO('yolov8n.pt')
+app = Flask(__name__)
+CORS(app)
 
-def detect_objects(image_base64):
+model = YOLO('yolo11n.pt')  # أو أي نموذج تريده
+
+@app.route('/detect', methods=['POST'])
+def detect():
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({'error': 'No image provided'}), 400
+
+    image_base64 = data['image']
+    if ',' in image_base64:
+        image_base64 = image_base64.split(',')[1]
+
     img_bytes = base64.b64decode(image_base64)
     nparr = np.frombuffer(img_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
     results = model(img)[0]
-
     detections = []
     for box in results.boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-        conf = float(box.conf[0])
         cls = int(box.cls[0])
         label = model.names[cls]
-        detections.append({
-            'label': label,
-            'confidence': conf,
-            'bbox': [x1, y1, x2, y2]
-        })
+        conf = float(box.conf[0])
+        detections.append({'label': label, 'confidence': conf})
 
-    annotated_img = results.plot()
-    _, buffer = cv2.imencode('.jpg', annotated_img)
-    annotated_base64 = base64.b64encode(buffer).decode('utf-8')
+    return jsonify({'detections': detections})
 
-    return detections, annotated_base64
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
